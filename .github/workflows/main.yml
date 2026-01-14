@@ -33,7 +33,7 @@ jobs:
       run: |
         git config --global user.name "GitHub Action Bot"
         git config --global user.email "actions@github.com"
-        git add nowtv.m3u8
+        git add ulusal_kanallar.m3u8
         # Eğer dosya değişmediyse hata vermemesi için "|| echo" ekledik
         git commit -m "M3U8 Güncellendi: $(date)" || echo "Değişiklik yok, commit atlanıyor."
         git push
