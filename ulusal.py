@@ -18,81 +18,94 @@ CHANNELS = [
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 OUTPUT_FILENAME = "ulusal_kanallar.m3u8"
 
-def find_stream_by_response(browser, channel_info):
+def find_stream_candidates(browser, channel_info):
     url = channel_info["url"]
     name = channel_info["name"]
-    print(f"\n📡 {name} aranıyor (MIME Type Analizi)... ({url})")
+    print(f"\n📡 {name} taranıyor... ({url})")
 
-    found_data = {"url": None, "referer": None}
+    # Bulunan tüm potansiyel linkleri buraya atacağız
+    candidates = []
     
     context = browser.new_context(user_agent=USER_AGENT)
     page = context.new_page()
 
-    # --- YANIT DİNLEYİCİSİ (RESPONSE LISTENER) ---
-    # Artık sadece isme değil, sunucunun "Bu bir yayındır" dediği yanıtlara bakıyoruz.
     def handle_response(response):
-        nonlocal found_data
-        
-        # Eğer en iyi linki (daioncdn) zaten bulduysak diğerlerini boşver
-        if found_data["url"] and "daioncdn" in found_data["url"]:
-            return
-
         try:
-            # Yanıtın türünü (Content-Type) kontrol et
-            # Genellikle: application/vnd.apple.mpegurl veya application/x-mpegurl
+            # 1. MIME Type Kontrolü (Kesin Çözüm)
             content_type = response.headers.get("content-type", "").lower()
             req_url = response.url
 
+            # Eğer yanıt bir m3u8 dosyası ise
             if "mpegurl" in content_type or ".m3u8" in req_url:
                 
                 # --- FİLTRELER ---
+                # ATV Token servisini engelle
                 if "securevideotoken" in req_url or "tmgrup.com.tr" in req_url:
-                    return # ATV token servisi, yayın değil.
+                    return 
+                # Reklamları engelle
                 if "ad_break" in req_url or "google" in req_url or "doubleclick" in req_url:
-                    return # Reklam
+                    return
+                # Başarısız istekleri engelle
                 if response.status != 200:
-                    return # Hatalı veya engellenmiş yanıtları alma
-
-                # --- 1. EN İYİ LİNK (ATV için DAION) ---
-                if "daioncdn" in req_url:
-                    print(f"   🔥 {name} İÇİN ORİJİNAL YAYIN (DAION) YAKALANDI!")
-                    # Bu isteği yaparken kullanılan headerları al
-                    headers = response.request.all_headers()
-                    found_data["url"] = req_url
-                    found_data["referer"] = headers.get("referer", url)
                     return
 
-                # --- 2. STANDART LİNK ---
-                if not found_data["url"]:
-                    print(f"   ✅ {name} için geçerli yayın türü tespit edildi: {content_type}")
-                    headers = response.request.all_headers()
-                    found_data["url"] = req_url
-                    found_data["referer"] = headers.get("referer", url)
+                # --- HEADER ALMA (GÜVENLİ YÖNTEM) ---
+                referer = url # Varsayılan olarak site adresi
+                try:
+                    # Header'ı almayı dene, alamazsan site adresini kullan
+                    header_ref = response.request.header_value("referer")
+                    if header_ref:
+                        referer = header_ref
+                except:
+                    pass
+
+                # Listeye ekle
+                entry = {"url": req_url, "referer": referer}
+                candidates.append(entry)
+                
+                # Kullanıcıya bilgi ver (Sadece URL'in sonunu göster)
+                short_url = req_url.split('?')[0][-30:]
+                print(f"   ✅ Aday Link Bulundu: ...{short_url}")
 
         except Exception:
             pass
 
-    # "request" yerine "response" dinliyoruz
     page.on("response", handle_response)
 
     try:
         page.goto(url, timeout=60000, wait_until="domcontentloaded")
-        print("   ⏳ Sayfa yüklendi, yayın paketleri bekleniyor...")
+        print("   ⏳ Yayın izleniyor (15 sn)...")
         
-        # 25 saniye bekle
-        for _ in range(25):
-            if found_data["url"] and "daioncdn" in found_data["url"]:
-                break
+        # Linklerin havuza düşmesi için bekle
+        # DaionCDN gelse bile biraz bekleyelim ki diğer alternatifler de düşsün
+        for _ in range(15):
             time.sleep(1)
+            # Eğer halihazırda DaionCDN bulduysak çok beklemeye gerek yok, erken çık
+            has_daion = any("daioncdn" in c["url"] for c in candidates)
+            if has_daion:
+                print("   🔥 En iyi kaynak (Daion) tespit edildi, erken çıkılıyor.")
+                break
             
     except Exception as e:
-        print(f"   ❌ Hata: {e}")
+        print(f"   ❌ Tarama hatası: {e}")
 
     page.close()
-    return found_data
+    
+    # --- EN İYİ LİNKİ SEÇME ---
+    if not candidates:
+        return None
+
+    # 1. Öncelik: İçinde 'daioncdn' geçen link (ATV için)
+    for c in candidates:
+        if "daioncdn" in c["url"]:
+            return c
+            
+    # 2. Öncelik: Herhangi bir geçerli link (NOW TV için)
+    # Genellikle son bulunan link en güncel olandır, o yüzden listeyi ters çevirip bakabiliriz
+    return candidates[-1]
 
 def main():
-    print("🚀 Ulusal Kanal Tarayıcı (V3 - MIME Type) Başlatılıyor...")
+    print("🚀 Ulusal Kanal Tarayıcı (V4 - Liste Modu) Başlatılıyor...")
     
     m3u_entries = []
 
@@ -100,11 +113,11 @@ def main():
         browser = p.chromium.launch(headless=True)
         
         for channel in CHANNELS:
-            result = find_stream_by_response(browser, channel)
+            best_candidate = find_stream_candidates(browser, channel)
             
-            if result["url"]:
-                stream_url = result["url"]
-                referer = result["referer"]
+            if best_candidate:
+                stream_url = best_candidate["url"]
+                referer = best_candidate["referer"]
                 
                 entry_lines = [
                     f'#EXTINF:-1 tvg-name="{channel["name"]}" group-title="{channel["group"]}",{channel["name"]}',
@@ -113,9 +126,9 @@ def main():
                     stream_url
                 ]
                 m3u_entries.append("\n".join(entry_lines))
-                print(f"   💾 Eklendi: {stream_url[:50]}...")
+                print(f"   💾 KAYDEDİLDİ: {channel['name']}")
             else:
-                print(f"   ⚠️ {channel['name']} için yayın paketi bulunamadı.")
+                print(f"   ⚠️ {channel['name']} için uygun link yakalanamadı.")
 
         browser.close()
 
@@ -126,7 +139,7 @@ def main():
         with open(OUTPUT_FILENAME, "w", encoding="utf-8") as f:
             f.write(full_content)
         
-        print(f"\n📂 Dosya Kaydedildi: {OUTPUT_FILENAME}")
+        print(f"\n📂 Dosya Oluşturuldu: {OUTPUT_FILENAME}")
     else:
         print("\n❌ Hiçbir kanal bulunamadı.")
 
