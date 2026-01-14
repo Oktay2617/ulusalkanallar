@@ -1,7 +1,9 @@
 #EXTM3U
-#EXT-X-USER-AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36
-#EXT-X-ALLOW-CACHE:NO
 #EXTINF:-1 tvg-name="NOW TV" group-title="Ulusal Kanallar",NOW TV
-https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=02OCzPoJppBSDb4bbsHIaw&e=1768447837
+#EXT-X-REFERER:https://www.nowtv.com.tr/
+#EXT-X-USER-AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+https://nowtv-live-ad.ercdn.net/nowtv/nowtv_480p.m3u8?e=1768492239&st=PKdsxdTQGhxH2l3OvQgQIw
 #EXTINF:-1 tvg-name="ATV" group-title="Ulusal Kanallar",ATV
-https://trkvz-live.ercdn.net/atvhd/atvhd.m3u8?st=gAAdMaNFGnaYqvUjOS1ASA&e=1768478965
+#EXT-X-REFERER:https://www.atv.com.tr/
+#EXT-X-USER-AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36
+https://trkvz-live.ercdn.net/atvhd/atvhd_360p.m3u8?st=gP6qmkD-0kAFmeB3fl7J1g&e=1768480068
