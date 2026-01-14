@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-X-USER-AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+#EXTINF:-1 tvg-name="NOW TV" group-title="Ulusal Kanallar",NOW TV
+https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=v29UfG88Nnheki9stG68JQ&e=1768447236
+#EXTINF:-1 tvg-name="ATV" group-title="Ulusal Kanallar",ATV
+https://securevideotoken.tmgrup.com.tr/webtv/secure?888803&url=https%3A%2F%2Ftrkvz-live.ercdn.net%2Fatvhd%2Fatvhd.m3u8&url2=https%3A%2F%2Ftrkvz-live.ercdn.net%2Fatvhd%2Fatvhd.m3u8
