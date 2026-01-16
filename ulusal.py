@@ -15,63 +15,76 @@ CHANNELS = [
     }
 ]
 
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+# --- STRATEJİ DEĞİŞİKLİĞİ: IPHONE USER-AGENT ---
+# Siteye kendimizi iPhone olarak tanıtıyoruz. 
+# Bu genellikle 'daioncdn' sunucusunu tetikler.
+IPHONE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
 OUTPUT_FILENAME = "ulusal_kanallar.m3u8"
 
-def find_best_stream(browser, channel_info):
+def find_specific_stream(browser, channel_info):
     url = channel_info["url"]
     name = channel_info["name"]
-    print(f"\n📡 {name} taranıyor... ({url})")
+    print(f"\n📡 {name} taranıyor (iPhone Modu)...")
 
-    # Adayları toplayacağımız havuz
-    # Yapı: {'priority': puan, 'url': url, 'referer': referer}
-    # Puanlama: DaionCDN = 100 puan, Diğerleri = 50 puan
-    candidates = []
+    found_stream = None
     
-    context = browser.new_context(user_agent=USER_AGENT)
+    # iPhone boyutlarında ve kimliğinde bir sayfa aç
+    context = browser.new_context(
+        user_agent=IPHONE_USER_AGENT,
+        viewport={"width": 390, "height": 844}, # iPhone 12/13/14 boyutları
+        is_mobile=True,
+        has_touch=True
+    )
     page = context.new_page()
 
     def handle_response(response):
+        nonlocal found_stream
+        # Eğer zaten bulduysak işlem yapma
+        if found_stream: return
+
         try:
             req_url = response.url
             
-            # Linkin içinde .m3u8 geçiyor mu?
+            # Link .m3u8 mi?
             if ".m3u8" in req_url:
                 
-                # --- İSTENMEYENLERİ ELE ---
-                if "securevideotoken" in req_url or "tmgrup.com.tr" in req_url: return # Token servisi
-                if "ad_break" in req_url or "google" in req_url: return # Reklam
-                if response.status != 200: return # Hatalı link
+                # --- YASAKLI LİSTESİ ---
+                if "securevideotoken" in req_url: return
+                if "ad_break" in req_url or "google" in req_url: return
                 
-                # --- PUANLAMA SİSTEMİ ---
-                priority = 0
+                # --- ÖZEL FİLTRELER ---
                 
-                # 1. HEDEF: ATV için DAIONCDN (En Yüksek Puan)
-                # Linkin içinde hem 'daioncdn' hem de 'atv.m3u8' geçmeli
-                if "daioncdn" in req_url and "atv.m3u8" in req_url:
-                    priority = 100
-                    print(f"   🔥 [ALTIN] DAIONCDN Linki Yakalandı!")
-                
-                # 2. YEDEK: ERCDN (Düşük Puan)
-                elif "ercdn" in req_url:
-                    priority = 50
-                    print(f"   ⚠️ [GÜMÜŞ] ERCDN Linki Yakalandı (Yedek)")
-                
-                # 3. GENEL: NOW TV vb.
-                else:
-                    priority = 70
-                    print(f"   ✅ Standart Link Yakalandı")
+                # ATV İÇİN KATI KURAL:
+                # Sadece ve sadece 'daioncdn' kabul et. 'ercdn' gelirse görmezden gel.
+                if name == "ATV":
+                    if "daioncdn" in req_url:
+                        print(f"   🔥 [HEDEF] ATV DaionCDN Yakalandı!")
+                        
+                        # Referer al
+                        referer = url
+                        try:
+                            r = response.request.header_value("referer")
+                            if r: referer = r
+                        except: pass
+                        
+                        found_stream = {"url": req_url, "referer": referer}
+                    else:
+                        # ercdn gelirse loga yaz ama alma
+                        if "ercdn" in req_url:
+                            # Debug için yazdırıyoruz, ama found_stream'e atamıyoruz
+                            pass 
 
-                # Header bilgisini al
-                referer = url
-                try:
-                    header_ref = response.request.header_value("referer")
-                    if header_ref: referer = header_ref
-                except: pass
-
-                # Listeye ekle
-                entry = {"url": req_url, "referer": referer, "priority": priority}
-                candidates.append(entry)
+                # NOW TV İÇİN KURAL:
+                elif name == "NOW TV":
+                    # Standart işleyiş
+                    referer = url
+                    try:
+                        r = response.request.header_value("referer")
+                        if r: referer = r
+                    except: pass
+                    found_stream = {"url": req_url, "referer": referer}
+                    print(f"   ✅ NOW TV Linki: ...{req_url[-30:]}")
 
         except Exception:
             pass
@@ -79,73 +92,62 @@ def find_best_stream(browser, channel_info):
     page.on("response", handle_response)
 
     try:
+        # Sayfaya git
         page.goto(url, timeout=60000, wait_until="domcontentloaded")
-        print("   ⏳ Yayın trafiği izleniyor (Maks 30sn)...")
         
-        # Bekleme Döngüsü
-        for i in range(30):
+        # ATV için biraz daha uzun, NOW için kısa bekleme
+        wait_time = 35 if name == "ATV" else 20
+        
+        print(f"   ⏳ Yayın akışı izleniyor ({wait_time} sn)...")
+        
+        # Bekleme döngüsü
+        for i in range(wait_time):
             page.wait_for_timeout(1000)
             
-            # ERKEN ÇIKIŞ KONTROLLERİ
-            # Eğer ATV tarıyorsak ve 100 puanlık (Daion) link bulduysak bekleme, çık.
-            if name == "ATV":
-                if any(c['priority'] == 100 for c in candidates):
-                    print("   🚀 Hedef link (Daion) bulundu, döngü kırılıyor.")
-                    break
+            # Eğer ATV ise ve DaionCDN bulduysak çık
+            if name == "ATV" and found_stream:
+                break
             
-            # NOW TV için standart m3u8 bulduysak 5. saniyeden sonra çıkabiliriz (hız için)
-            if name == "NOW TV" and i > 5:
-                 if any("playlist.m3u8" in c['url'] for c in candidates):
-                    break
-
+            # NOW TV ise hemen çık
+            if name == "NOW TV" and found_stream:
+                break
+                
     except Exception as e:
         print(f"   ❌ Hata: {e}")
 
     page.close()
     context.close()
-
-    # --- SEÇİM ZAMANI ---
-    if not candidates:
-        return None
-
-    # Puanı en yüksek olanı, puanlar eşitse en son bulunanı (en güncel) seç
-    # Python'da sort stable olduğu için, önce önceliğe göre sıralarız.
-    candidates.sort(key=lambda x: x['priority'], reverse=True)
-    
-    best = candidates[0]
-    return best
+    return found_stream
 
 def main():
-    print("🚀 Ulusal Kanal Tarayıcı (V6 - Hedef Odaklı) Başlatılıyor...")
+    print("🚀 Ulusal Kanal Tarayıcı (V7 - iPhone & Strict Filter) Başlatılıyor...")
     
     m3u_entries = []
 
     with sync_playwright() as p:
+        # Mobil emülasyonu için normal chromium başlatıyoruz, context ayarlarıyla mobile çevireceğiz
         browser = p.chromium.launch(headless=True)
         
         for channel in CHANNELS:
-            best_candidate = find_best_stream(browser, channel)
+            result = find_specific_stream(browser, channel)
             
-            if best_candidate:
-                stream_url = best_candidate["url"]
-                referer = best_candidate["referer"]
+            if result:
+                stream_url = result["url"]
+                referer = result["referer"]
                 
                 entry_lines = [
                     f'#EXTINF:-1 tvg-name="{channel["name"]}" group-title="{channel["group"]}",{channel["name"]}',
                     f'#EXT-X-REFERER:{referer}',
-                    f'#EXT-X-USER-AGENT:{USER_AGENT}',
+                    f'#EXT-X-USER-AGENT:{IPHONE_USER_AGENT}', # User-Agent'ı iPhone olarak dosyaya da yazıyoruz
                     stream_url
                 ]
                 m3u_entries.append("\n".join(entry_lines))
                 
-                # URL'in bir kısmını gösterelim ki doğru mu emin olalım
-                clean_url_log = stream_url.split('?')[0]
-                if "daioncdn" in stream_url:
-                    print(f"   🏆 KAZANAN LİNK: ...daioncdn... ({clean_url_log[-20:]})")
-                else:
-                    print(f"   💾 KAZANAN LİNK: ...{clean_url_log[-20:]}")
+                # Logda ne bulduğumuzu görelim
+                clean_url = stream_url.split('?')[0]
+                print(f"   💾 EKLENDİ: {clean_url[-40:]}")
             else:
-                print(f"   ⚠️ {channel['name']} için link bulunamadı.")
+                print(f"   ⚠️ {channel['name']} için istenen kriterde link bulunamadı.")
 
         browser.close()
 
