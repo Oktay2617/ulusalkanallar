@@ -1,5 +1,6 @@
 #EXTM3U
 #EXT-X-USER-AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
-#EXT-X-REFERER:https://www.nowtv.com.tr/canli-yayin
+#EXT-X-REFERER:https://wtsdde.cfd/
+#EXT-X-ORIGIN:https://wtsdde.cfd
 #EXTINF:-1 tvg-name="NOW TV" group-title="Ulusal Kanallar",NOW TV
-https://nowtv-live-ad.ercdn.net/nowtv/playlist.m3u8?st=iLsm_XRE_LyoU7Ne1WjwEA&e=1768446936
+https://s4.crazy3.cfd/hls2/01/00007/83s6azw8u88r_n/seg-33-v1-a1.jpg
