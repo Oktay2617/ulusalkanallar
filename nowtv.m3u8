@@ -1,6 +1,4 @@
 #EXTM3U
 #EXT-X-USER-AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
-#EXT-X-REFERER:https://wtsdde.cfd/
-#EXT-X-ORIGIN:https://wtsdde.cfd
 #EXTINF:-1 tvg-name="NOW TV" group-title="Ulusal Kanallar",NOW TV
-https://s4.wtsddr.xyz/hls2/01/00007/83s6azw8u88r_n/index-a1.m3u8
+http://116.202.238.88/FOXTV_TR/index.m3u8
